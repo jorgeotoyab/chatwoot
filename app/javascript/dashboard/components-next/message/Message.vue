@@ -518,6 +518,25 @@ const setupHighlightTimer = () => {
 
 onMounted(setupHighlightTimer);
 
+/**
+ * WhatsApp-style reactions attached to this message (populated by the
+ * WhatsApp incoming service into content_attributes.reactions).
+ * @type {import('vue').ComputedRef<Array<{emoji: string, from: string}>>}
+ */
+const messageReactions = computed(
+  () => props.contentAttributes?.reactions || []
+);
+
+const uniqueReactionEmojis = computed(() => [
+  ...new Set(messageReactions.value.map(reaction => reaction.emoji)),
+]);
+
+const reactionsTooltip = computed(() =>
+  messageReactions.value
+    .map(reaction => `${reaction.emoji} +${reaction.from}`)
+    .join(' · ')
+);
+
 provideMessageContext({
   ...toRefs(props),
   isPrivate: computed(() => props.private),
@@ -568,14 +587,35 @@ provideMessageContext({
         <Avatar v-bind="avatarInfo" :size="24" />
       </div>
       <div
-        class="[grid-area:bubble] flex min-w-0"
+        class="[grid-area:bubble] flex min-w-0 relative"
         :class="{
           'ltr:ml-8 rtl:mr-8 justify-end': orientation === ORIENTATION.RIGHT,
           'ltr:mr-8 rtl:ml-8': orientation === ORIENTATION.LEFT,
+          'mb-3': messageReactions.length,
         }"
         @contextmenu="openContextMenu($event)"
       >
         <Component :is="componentToRender" />
+        <div
+          v-if="messageReactions.length"
+          v-tooltip.top="reactionsTooltip"
+          class="absolute -bottom-3.5 z-10 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-n-solid-2 border border-n-weak shadow-sm text-sm leading-none select-none"
+          :class="
+            orientation === ORIENTATION.RIGHT
+              ? 'ltr:right-1 rtl:left-1'
+              : 'ltr:left-1 rtl:right-1'
+          "
+        >
+          <span v-for="emoji in uniqueReactionEmojis" :key="emoji">
+            {{ emoji }}
+          </span>
+          <span
+            v-if="messageReactions.length > 1"
+            class="text-xs text-n-slate-11 ltr:ml-0.5 rtl:mr-0.5"
+          >
+            {{ messageReactions.length }}
+          </span>
+        </div>
       </div>
       <MessageError
         v-if="contentAttributes.externalError"

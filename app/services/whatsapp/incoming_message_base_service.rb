@@ -25,8 +25,12 @@ class Whatsapp::IncomingMessageBaseService
   private
 
   def process_messages
-    # We don't support reactions & ephemeral message now, we need to skip processing the message
-    # if the webhook event is a reaction or an ephermal message or an unsupported message.
+    # Reactions are attached to the original message (content_attributes) instead
+    # of being skipped, so agents can see them on the bubble like in WhatsApp.
+    return process_reaction if message_type == 'reaction'
+
+    # We don't support ephemeral messages now, we need to skip processing the message
+    # if the webhook event is an ephermal message or an unsupported message.
     return if unprocessable_message_type?(message_type)
 
     # Multiple webhook events can be received for the same message due to
@@ -44,6 +48,25 @@ class Whatsapp::IncomingMessageBaseService
       set_conversation
       create_messages
     end
+  end
+
+  # Stores the reaction on the reacted message's content_attributes so the
+  # dashboard can render it on the bubble (WhatsApp style). An empty emoji
+  # means the user removed their reaction. One reaction per sender is kept.
+  def process_reaction
+    message_payload = messages_data.first
+    reaction = message_payload[:reaction]
+    return if reaction.blank? || reaction[:message_id].blank?
+
+    target_message = @inbox.messages.find_by(source_id: reaction[:message_id])
+    return if target_message.blank?
+
+    sender = message_payload[:from].to_s
+    reactions = (target_message.content_attributes['reactions'] || []).reject { |r| r['from'].to_s == sender }
+    reactions << { 'emoji' => reaction[:emoji], 'from' => sender } if reaction[:emoji].present?
+
+    target_message.content_attributes = target_message.content_attributes.merge('reactions' => reactions)
+    target_message.save!
   end
 
   def process_statuses
