@@ -84,6 +84,9 @@ export default {
       isProgrammaticScroll: false,
       messageSentSinceOpened: false,
       labelSuggestions: [],
+      floatingDate: '',
+      showFloatingDate: false,
+      floatingDateTimer: null,
     };
   },
 
@@ -275,6 +278,7 @@ export default {
   unmounted() {
     this.removeBusListeners();
     this.removeScrollListener();
+    clearTimeout(this.floatingDateTimer);
   },
 
   methods: {
@@ -424,9 +428,51 @@ export default {
         this.hasUserScrolled = false;
       } else {
         this.hasUserScrolled = true;
+        this.updateFloatingDate();
       }
       emitter.emit(BUS_EVENTS.ON_MESSAGE_LIST_SCROLL);
       this.fetchPreviousMessages(e.target.scrollTop);
+    },
+
+    // YasuiTV: píldora flotante de fecha estilo WhatsApp — muestra la fecha
+    // del mensaje visible más arriba mientras se scrollea y se desvanece al
+    // detenerse. Los <li> de Message llevan data-created-at (MessageList).
+    updateFloatingDate() {
+      const panel = this.conversationPanel;
+      if (!panel) return;
+      const panelTop = panel.getBoundingClientRect().top;
+      const nodes = panel.querySelectorAll('[data-created-at]');
+      let timestamp = null;
+      // Primer mensaje cuyo borde inferior ya entró al viewport del panel
+      for (const el of nodes) {
+        if (el.getBoundingClientRect().bottom >= panelTop + 8) {
+          timestamp = Number(el.dataset.createdAt);
+          break;
+        }
+      }
+      if (!timestamp) return;
+      this.floatingDate = this.formatFloatingDate(timestamp);
+      this.showFloatingDate = true;
+      clearTimeout(this.floatingDateTimer);
+      this.floatingDateTimer = setTimeout(() => {
+        this.showFloatingDate = false;
+      }, 1200);
+    },
+
+    formatFloatingDate(timestamp) {
+      const date = new Date(timestamp * 1000);
+      const now = new Date();
+      const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const diffDays = Math.round(
+        (startOfDay(now) - startOfDay(date)) / 86400000
+      );
+      const locale = (this.$i18n?.locale || 'es').replace('_', '-');
+      const isSpanish = locale.toLowerCase().startsWith('es');
+      if (diffDays === 0) return isSpanish ? 'Hoy' : 'Today';
+      if (diffDays === 1) return isSpanish ? 'Ayer' : 'Yesterday';
+      const options = { weekday: 'short', day: 'numeric', month: 'short' };
+      if (date.getFullYear() !== now.getFullYear()) options.year = 'numeric';
+      return date.toLocaleDateString(locale, options);
     },
 
     makeMessagesRead() {
@@ -450,8 +496,20 @@ export default {
 <template>
   <div
     ref="messagesViewRef"
-    class="flex flex-col justify-between flex-grow h-full min-w-0 m-0"
+    class="relative flex flex-col justify-between flex-grow h-full min-w-0 m-0"
   >
+    <!-- YasuiTV: indicador flotante de fecha al scrollear (estilo WhatsApp) -->
+    <div
+      class="absolute left-1/2 -translate-x-1/2 z-20 transition-opacity duration-300 pointer-events-none"
+      :class="showFloatingDate ? 'opacity-100' : 'opacity-0'"
+      :style="{ top: `${topBannerHeight + 8}px` }"
+    >
+      <span
+        class="shadow-md rounded-full bg-white dark:bg-n-solid-3 text-n-slate-11 text-xs font-medium px-3 py-1.5"
+      >
+        {{ floatingDate }}
+      </span>
+    </div>
     <div ref="topBannerRef">
       <Banner
         v-if="!currentChat.can_reply"

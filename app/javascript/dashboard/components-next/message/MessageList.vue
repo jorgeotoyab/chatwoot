@@ -178,6 +178,7 @@ const getInReplyToMessage = parentMessage => {
         :inbox-supports-reply-to="inboxSupportsReplyTo"
         :current-user-id="currentUserId"
         data-clarity-mask="True"
+        :data-created-at="message.createdAt"
         @retry="emit('retry', message)"
       />
     </template>
