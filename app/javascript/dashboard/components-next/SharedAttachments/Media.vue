@@ -26,9 +26,16 @@ const emit = defineEmits(['select', 'jumpToMessage']);
 
 const { t } = useI18n();
 
+// YasuiTV: los stickers de WhatsApp (webp) no son "fotos" — fuera de la grilla
+const isSticker = a =>
+  String(a.data_url || '')
+    .split('?')[0]
+    .toLowerCase()
+    .endsWith('.webp') || a.extension === 'webp';
+
 const mediaAttachments = computed(() =>
   [...props.attachments]
-    .filter(a => a.data_url && MEDIA_TYPES.includes(a.file_type))
+    .filter(a => a.data_url && MEDIA_TYPES.includes(a.file_type) && !isSticker(a))
     .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
 );
 

@@ -19,9 +19,16 @@ const allAttachments = useMapGetter('getSelectedChatAttachments');
 const attachmentsLoaded = useMapGetter('getSelectedChatAttachmentsLoaded');
 const { t } = useI18n();
 
+// YasuiTV: excluir stickers (webp) — la grilla Media también los filtra
+const isSticker = a =>
+  String(a.data_url || '')
+    .split('?')[0]
+    .toLowerCase()
+    .endsWith('.webp') || a.extension === 'webp';
+
 const mediaAttachments = computed(() =>
   allAttachments.value
-    .filter(a => MEDIA_TYPES.includes(a.file_type) && a.data_url)
+    .filter(a => MEDIA_TYPES.includes(a.file_type) && a.data_url && !isSticker(a))
     .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
 );
 
