@@ -162,8 +162,10 @@ watch(
             'flex-1 justify-between': !showInboxName,
           }"
         >
+          <!-- YasuiTV: nombre del asignado oculto en la lista (pedido 2026-08-04);
+               v-if="false" para reactivarlo fácil quitando esa condición -->
           <span
-            v-if="showAssignee && assignee.name"
+            v-if="false && showAssignee && assignee.name"
             class="text-n-slate-11 text-xs font-medium leading-3 py-0.5 px-0 inline-flex items-center gap-px truncate"
           >
             <Icon
