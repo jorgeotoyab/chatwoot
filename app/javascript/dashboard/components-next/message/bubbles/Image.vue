@@ -61,8 +61,10 @@ const handleImageError = () => {
       </p>
     </div>
     <div v-else-if="isLoaded" class="relative group rounded-lg overflow-hidden">
+      <!-- YasuiTV: tope de 320px (estilo WhatsApp) — la galería mantiene el
+           tamaño completo al hacer click -->
       <img
-        class="skip-context-menu"
+        class="skip-context-menu max-w-[320px] max-h-[320px] w-auto h-auto object-contain"
         :src="attachment.dataUrl"
         :width="attachment.width"
         :height="attachment.height"
