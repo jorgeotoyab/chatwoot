@@ -28,6 +28,10 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
       'name ILIKE :search OR email ILIKE :search OR phone_number ILIKE :search OR contacts.identifier LIKE :search',
       search: "%#{params[:q].strip}%"
     )
+    # YasuiTV: contactos privados fuera de la búsqueda para no autorizados
+    unless Yasuitv::RestrictedChats.allowed?(Current.user)
+      contacts = contacts.where.not(id: Yasuitv::RestrictedChats.restricted_contact_ids(Current.account))
+    end
     @contacts = fetch_contacts_with_has_more(contacts)
   end
 
@@ -78,7 +82,10 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
 
   # TODO : refactor this method into dedicated contacts/custom_attributes controller class and routes
   def destroy_custom_attributes
-    @contact.custom_attributes = @contact.custom_attributes.excluding(params[:custom_attributes])
+    keys = Array(params[:custom_attributes])
+    # YasuiTV: solo los viewers autorizados pueden quitar el flag de chat privado
+    keys -= [Yasuitv::RestrictedChats::ATTRIBUTE_KEY] unless Yasuitv::RestrictedChats.allowed?(Current.user)
+    @contact.custom_attributes = @contact.custom_attributes.excluding(keys)
     @contact.save!
   end
 
@@ -175,9 +182,22 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   end
 
   def contact_custom_attributes
-    return @contact.custom_attributes.merge(permitted_params[:custom_attributes]) if permitted_params[:custom_attributes]
+    incoming = permitted_params[:custom_attributes]
+    return @contact.custom_attributes if incoming.blank?
 
-    @contact.custom_attributes
+    incoming = incoming.to_h
+    # YasuiTV: solo los viewers autorizados pueden marcar/desmarcar el flag de
+    # chat privado — cualquier otro usuario no puede alterarlo (se preserva el
+    # valor actual del contacto).
+    unless Yasuitv::RestrictedChats.allowed?(Current.user)
+      key = Yasuitv::RestrictedChats::ATTRIBUTE_KEY
+      if @contact.custom_attributes.key?(key)
+        incoming[key] = @contact.custom_attributes[key]
+      else
+        incoming.delete(key)
+      end
+    end
+    @contact.custom_attributes.merge(incoming)
   end
 
   def contact_additional_attributes

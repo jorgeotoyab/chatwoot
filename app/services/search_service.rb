@@ -26,6 +26,15 @@ class SearchService
     @accessable_inbox_ids ||= @current_user.assigned_inboxes.pluck(:id)
   end
 
+  # YasuiTV: chats privados fuera de toda búsqueda para no autorizados
+  def yasuitv_allowed?
+    Yasuitv::RestrictedChats.allowed?(current_user)
+  end
+
+  def yasuitv_restricted_ids
+    @yasuitv_restricted_ids ||= Yasuitv::RestrictedChats.restricted_contact_ids(current_account)
+  end
+
   def search_query
     @search_query ||= params[:q].to_s.strip
   end
@@ -40,6 +49,8 @@ class SearchService
       conversations_query = apply_time_filter(conversations_query,
                                               'conversations.last_activity_at')
     end
+
+    conversations_query = conversations_query.where.not(conversations: { contact_id: yasuitv_restricted_ids }) unless yasuitv_allowed?
 
     @conversations = conversations_query.order('conversations.created_at DESC')
                                         .page(params[:page])
@@ -107,6 +118,7 @@ class SearchService
   def message_base_query
     query = current_account.messages.where('created_at >= ?', 3.months.ago)
     query = query.where(inbox_id: accessable_inbox_ids) unless should_skip_inbox_filtering?
+    query = query.joins(:conversation).where.not(conversations: { contact_id: yasuitv_restricted_ids }) unless yasuitv_allowed?
     query
   end
 
@@ -168,6 +180,8 @@ class SearchService
     )
 
     contacts_query = apply_time_filter(contacts_query, 'last_activity_at') if current_account.feature_enabled?('advanced_search')
+
+    contacts_query = contacts_query.where.not(id: yasuitv_restricted_ids) unless yasuitv_allowed?
 
     @contacts = contacts_query.resolved_contacts(
       use_crm_v2: current_account.feature_enabled?('crm_v2')

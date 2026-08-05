@@ -8,15 +8,22 @@ class Conversations::PermissionFilterService
   end
 
   def perform
-    return conversations if user_role == 'administrator'
+    # YasuiTV: los chats de contactos privados se excluyen ANTES del early
+    # return de administradores — solo los viewers autorizados los ven.
+    scoped = conversations
+    unless Yasuitv::RestrictedChats.allowed?(user)
+      scoped = scoped.where.not(contact_id: Yasuitv::RestrictedChats.restricted_contact_ids(account))
+    end
 
-    accessible_conversations
+    return scoped if user_role == 'administrator'
+
+    accessible_conversations(scoped)
   end
 
   private
 
-  def accessible_conversations
-    conversations.where(inbox: user.inboxes.where(account_id: account.id))
+  def accessible_conversations(scoped)
+    scoped.where(inbox: user.inboxes.where(account_id: account.id))
   end
 
   def account_user

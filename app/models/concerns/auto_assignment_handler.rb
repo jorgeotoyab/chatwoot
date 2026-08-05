@@ -9,6 +9,11 @@ module AutoAssignmentHandler
   private
 
   def run_auto_assignment
+    # YasuiTV: los chats de contactos privados no entran al round-robin —
+    # quedarían asignados a alguien que no puede verlos. Quedan sin asignar
+    # hasta que un viewer autorizado los tome.
+    return if Yasuitv::RestrictedChats.restricted?(contact)
+
     # Assignment V2: Also trigger assignment when conversation is resolved or snoozed,
     # bypassing the open-only condition so the AssignmentJob can redistribute capacity.
     return unless conversation_status_changed_to_open? || conversation_status_changed_to_resolved_or_snoozed?
