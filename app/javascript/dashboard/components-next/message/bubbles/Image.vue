@@ -22,6 +22,19 @@ const attachment = computed(() => {
 
 const { isLoaded, hasError, loadWithRetry } = useLoadWithRetry();
 
+// YasuiTV: los stickers de WhatsApp llegan como image/webp (las fotos son
+// jpeg) — se muestran más chicos, como en WhatsApp.
+const isSticker = computed(() => {
+  const { dataUrl, extension } = attachment.value || {};
+  return (
+    extension === 'webp' ||
+    String(dataUrl || '')
+      .split('?')[0]
+      .toLowerCase()
+      .endsWith('.webp')
+  );
+});
+
 const showGallery = ref(false);
 const isDownloading = ref(false);
 
@@ -61,10 +74,15 @@ const handleImageError = () => {
       </p>
     </div>
     <div v-else-if="isLoaded" class="relative group rounded-lg overflow-hidden">
-      <!-- YasuiTV: tope de 320px (estilo WhatsApp) — la galería mantiene el
-           tamaño completo al hacer click -->
+      <!-- YasuiTV: tope de 320px para fotos y 192px para stickers (estilo
+           WhatsApp) — la galería mantiene el tamaño completo al hacer click -->
       <img
-        class="skip-context-menu max-w-[320px] max-h-[320px] w-auto h-auto object-contain"
+        class="skip-context-menu w-auto h-auto object-contain"
+        :class="
+          isSticker
+            ? 'max-w-[192px] max-h-[192px]'
+            : 'max-w-[320px] max-h-[320px]'
+        "
         :src="attachment.dataUrl"
         :width="attachment.width"
         :height="attachment.height"
